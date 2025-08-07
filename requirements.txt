@@ -1,3 +1,3 @@
-python-telegram-bot==13.15
-urllib3==1.26.18
-requests
+python-telegram-bot==21.1
+aiohttp==3.9.5
+
