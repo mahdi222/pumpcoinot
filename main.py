@@ -1,13 +1,20 @@
-import telegram
-import time
 import os
+import time
+import telegram
 
-TOKEN = os.getenv("8296961071:AAEWjoANG7T00w0-svmSyIVM4vSosOjgdB4
-")
-CHAT_ID = os.getenv("610160171")
+TOKEN = os.getenv("TOKEN")
+CHAT_ID = os.getenv("CHAT_ID")
 
 bot = telegram.Bot(token=TOKEN)
 
-while True:
+def send_heartbeat():
     bot.send_message(chat_id=CHAT_ID, text="✅ ربات پامپ‌یاب Railway فعال است.")
-    time.sleep(3600)  # هر 1 ساعت یه پیام تست می‌فرسته
+
+if __name__ == "__main__":
+    while True:
+        try:
+            send_heartbeat()
+            time.sleep(3600)  # هر 1 ساعت یک پیام تست می‌فرسته
+        except Exception as e:
+            print(f"Error: {e}")
+            time.sleep(60)
