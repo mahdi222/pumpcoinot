@@ -1,9 +1,11 @@
 import telegram
 import time
 
-TOKEN = "8296961071:AAEWjoANG7T00w0-svmSyIVM4vSosOjgdB4
-"
-CHAT_ID = "610160171"
+import os
+
+TOKEN = os.getenv("8296961071:AAEWjoANG7T00w0-svmSyIVM4vSosOjgdB4
+")
+CHAT_ID = os.getenv("610160171")
 
 bot = telegram.Bot(token=TOKEN)
 
