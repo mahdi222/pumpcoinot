@@ -1,6 +1,5 @@
 import telegram
 import time
-
 import os
 
 TOKEN = os.getenv("8296961071:AAEWjoANG7T00w0-svmSyIVM4vSosOjgdB4
