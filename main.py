@@ -1,8 +1,9 @@
 import telegram
 import time
 
-TOKEN = "توکن باتت"
-CHAT_ID = "آی‌دی عددی تلگرامت"
+TOKEN = "8296961071:AAEWjoANG7T00w0-svmSyIVM4vSosOjgdB4
+"
+CHAT_ID = "610160171"
 
 bot = telegram.Bot(token=TOKEN)
 
