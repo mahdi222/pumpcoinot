@@ -13,11 +13,14 @@ CHAT_ID = os.getenv("CHAT_ID")
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-async def send_error(bot: Bot, err: Exception):
-    error_text = f"❌ خطا:\n<pre>{traceback.format_exc()}</pre>"
-    logger.error(traceback.format_exc())
+async def send_error(bot: Bot, err_text: str, use_html=True):
+    logger.error(err_text)
     try:
-        await bot.send_message(chat_id=CHAT_ID, text=error_text, parse_mode=ParseMode.HTML)
+        if use_html:
+            await bot.send_message(chat_id=CHAT_ID, text=f"❌ خطا:\n<pre>{err_text}</pre>", parse_mode=ParseMode.HTML)
+        else:
+            # پیام ساده بدون HTML ارسال می‌کنیم
+            await bot.send_message(chat_id=CHAT_ID, text=f"❌ خطا:\n{err_text}")
     except Exception as e:
         logger.error(f"❌ خطا در ارسال پیام خطا به تلگرام: {e}")
 
@@ -38,7 +41,13 @@ async def check_pump(bot: Bot):
         async with aiohttp.ClientSession() as session:
             async with session.get(url, params=params) as response:
                 coins = await response.json()
-                logger.info(f"{len(coins)} تا کوین دریافت شد")
+                logger.info(f"داده دریافت شد: نوع داده {type(coins)}")
+
+                # اگر پاسخ دیکشنری بود یعنی خطایی دریافت کردیم
+                if isinstance(coins, dict):
+                    error_msg = coins.get("error") or str(coins)
+                    await send_error(bot, f"خطای API: {error_msg}", use_html=False)
+                    return
 
                 if not isinstance(coins, list):
                     raise ValueError(f"خروجی API لیست نیست! نوع داده: {type(coins)}")
@@ -57,8 +66,9 @@ async def check_pump(bot: Bot):
                 logger.info("پیام وضعیت کوین‌ها ارسال شد")
 
     except Exception as e:
-        logger.error(f"خطا در check_pump: {e}")
-        await send_error(bot, e)
+        err_text = traceback.format_exc()
+        logger.error(f"خطا در check_pump:\n{err_text}")
+        await send_error(bot, err_text)
 
 async def main_loop():
     bot = Bot(token=BOT_TOKEN)
