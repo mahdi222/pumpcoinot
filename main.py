@@ -18,10 +18,11 @@ async def send_error(bot: Bot, err: Exception):
     logger.error(traceback.format_exc())
     try:
         await bot.send_message(chat_id=CHAT_ID, text=error_text, parse_mode=ParseMode.HTML)
-    except:
-        logger.error("❌ خطا در ارسال پیام خطا به تلگرام")
+    except Exception as e:
+        logger.error(f"❌ خطا در ارسال پیام خطا به تلگرام: {e}")
 
 async def check_pump(bot: Bot):
+    logger.info("check_pump داره اجرا میشه...")
     url = "https://api.coingecko.com/api/v3/coins/markets"
     params = {
         "vs_currency": "usd",
@@ -37,6 +38,7 @@ async def check_pump(bot: Bot):
         async with aiohttp.ClientSession() as session:
             async with session.get(url, params=params) as response:
                 coins = await response.json()
+                logger.info(f"{len(coins)} تا کوین دریافت شد")
 
                 if not isinstance(coins, list):
                     raise ValueError(f"خروجی API لیست نیست! نوع داده: {type(coins)}")
@@ -52,30 +54,17 @@ async def check_pump(bot: Bot):
                     msg += f"{name} ({symbol}): 15m={change_15m:.2f}%, 30m={change_30m:.2f}%, 1h={change_1h:.2f}%, حجم: {volume}\n"
 
                 await bot.send_message(chat_id=CHAT_ID, text=msg)
+                logger.info("پیام وضعیت کوین‌ها ارسال شد")
 
     except Exception as e:
+        logger.error(f"خطا در check_pump: {e}")
         await send_error(bot, e)
-
-async def send_heartbeat(bot: Bot):
-    while True:
-        try:
-            await bot.send_message(chat_id=CHAT_ID, text="💓 بات فعال است و در حال اجرا...")
-            logger.info("پیام سلامت بات ارسال شد")
-        except Exception:
-            logger.error("خطا در ارسال پیام سلامت بات")
-        await asyncio.sleep(300)  # هر 5 دقیقه یکبار
 
 async def main_loop():
     bot = Bot(token=BOT_TOKEN)
-    await bot.send_message(chat_id=CHAT_ID, text="✅ ربات پامپ‌یاب ارتقا یافته شروع به کار کرد.")
+    await bot.send_message(chat_id=CHAT_ID, text="✅ ربات شروع به کار کرد")
     logger.info("ربات شروع به کار کرد")
 
-    await asyncio.gather(
-        run_check_pump_loop(bot),
-        send_heartbeat(bot),
-    )
-
-async def run_check_pump_loop(bot: Bot):
     while True:
         await check_pump(bot)
         await asyncio.sleep(300)
