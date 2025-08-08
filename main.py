@@ -70,7 +70,7 @@ async def check_pump(bot: Bot):
 
                     # چون کوین‌گکو حجم میانگین تاریخی رو نمیده، اینجا فرض می‌کنیم حجم پامپ شده حداقل 1.5 برابر حجم قبلیه
                     # برای نمونه ساده، حجم رو مقایسه نمی‌کنیم دقیق، فقط اگر حجم خیلی کم بود رد می‌کنیم (مثلاً کمتر از 1000 دلار)
-                    if volume < 1000:
+                    if volume < 1:
                         continue
 
                     change_15m = coin.get("price_change_percentage_15m_in_currency") or 0
