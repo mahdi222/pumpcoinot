@@ -19,17 +19,26 @@ NO_PUMP_ALERT_COOLDOWN = 60 * 5  # 5 دقیقه بین پیام "پامپی یا
 
 PUMP_THRESHOLD_1H = 50   # رشد ۱ ساعت برای پامپ اصلی
 PUMP_THRESHOLD_30M = 15  # رشد ۳۰ دقیقه برای پامپ متوسط
-PUMP_THRESHOLD_15M = 0.1   # رشد ۱۵ دقیقه برای پامپ احتمالی
+PUMP_THRESHOLD_15M = 0.1 # رشد ۱۵ دقیقه برای پامپ احتمالی
 
 PUMP_COOLDOWN = 60 * 60  # یک ساعت برای هر هشدار
 
+def escape_markdown_v2(text: str) -> str:
+    # تابع escape برای MarkdownV2 تلگرام
+    escape_chars = ['_', '*', '[', ']', '(', ')', '~', '`', '>', '#', '+', '-', '=', '|', '{', '}', '.', '!']
+    for ch in escape_chars:
+        text = text.replace(ch, '\\' + ch)
+    return text
+
 async def send_error(bot: Bot, err: Exception):
-    error_text = f"❌ خطا:\n<pre>{traceback.format_exc()}</pre>"
-    logger.error(traceback.format_exc())
+    tb = traceback.format_exc()
+    logger.error(tb)
+    escaped_tb = escape_markdown_v2(tb)
+    message = f"❌ خطا:\n```\n{escaped_tb}\n```"
     try:
-        await bot.send_message(chat_id=CHAT_ID, text=error_text, parse_mode=ParseMode.HTML)
-    except:
-        logger.error("❌ خطا در ارسال پیام خطا به تلگرام")
+        await bot.send_message(chat_id=CHAT_ID, text=message, parse_mode=ParseMode.MARKDOWN_V2)
+    except Exception as e:
+        logger.error(f"خطا در ارسال پیام خطا به تلگرام: {e}")
 
 async def check_pump(bot: Bot):
     url = "https://api.coingecko.com/api/v3/coins/markets"
@@ -52,8 +61,8 @@ async def check_pump(bot: Bot):
                     raise ValueError(f"خروجی API لیست نیست! نوع داده: {type(coins)}")
 
                 found_pump = False
-                found_pump_mid = False
                 found_pump_alert = False
+                found_pump_mid = False
 
                 now = time.time()
 
@@ -79,7 +88,8 @@ async def check_pump(bot: Bot):
                         last_alert = announced_coins.get(f"{coin_id}_1h", 0)
                         if now - last_alert > PUMP_COOLDOWN:
                             announced_coins[f"{coin_id}_1h"] = now
-                            message = f"""🚀 پامپ شدید شناسایی شد!
+                            message = f"""
+🚀 پامپ شدید شناسایی شد!
 <b>{name} ({symbol})</b>
 📈 رشد ۱ ساعته: <b>{change_1h:.2f}%</b>
 💰 قیمت فعلی: ${price}
@@ -95,7 +105,8 @@ async def check_pump(bot: Bot):
                         last_alert = announced_coins.get(f"{coin_id}_30m", 0)
                         if now - last_alert > PUMP_COOLDOWN:
                             announced_coins[f"{coin_id}_30m"] = now
-                            message = f"""⚡ پامپ متوسط در حال شکل‌گیری!
+                            message = f"""
+⚡ پامپ متوسط در حال شکل‌گیری!
 <b>{name} ({symbol})</b>
 📈 رشد ۳۰ دقیقه‌ای: <b>{change_30m:.2f}%</b>
 💰 قیمت فعلی: ${price}
@@ -111,7 +122,8 @@ async def check_pump(bot: Bot):
                         last_alert = announced_coins.get(f"{coin_id}_15m", 0)
                         if now - last_alert > PUMP_COOLDOWN:
                             announced_coins[f"{coin_id}_15m"] = now
-                            message = f"""⚠️ پامپ احتمالی در حال شکل‌گیری!
+                            message = f"""
+⚠️ پامپ احتمالی در حال شکل‌گیری!
 <b>{name} ({symbol})</b>
 📈 رشد ۱۵ دقیقه‌ای: <b>{change_15m:.2f}%</b>
 💰 قیمت فعلی: ${price}
@@ -122,6 +134,7 @@ async def check_pump(bot: Bot):
                             logger.info(f"پامپ احتمالی: {name} {change_15m:.2f}%")
                             found_pump_alert = True
 
+                # پیام عدم پامپ (فقط هر ۵ دقیقه یک بار)
                 global last_no_pump_alert
                 if not found_pump and not found_pump_mid and not found_pump_alert:
                     if now - last_no_pump_alert > NO_PUMP_ALERT_COOLDOWN:
