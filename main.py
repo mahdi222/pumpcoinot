@@ -3,8 +3,9 @@ from telegram import Bot
 import traceback
 
 import os
-BOT_TOKEN = os.getenv("BOT_TOKEN")
-CHAT_ID = os.getenv("CHAT_ID")
+BOT_TOKEN = 8296961071:AAEWjoANG7T00w0-svmSyIVM4vSosOjgdB4
+CHAT_ID = 610160171
+
 
 
 async def test():
