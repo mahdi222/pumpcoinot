@@ -1,47 +1,25 @@
 import asyncio
 import logging
 import aiohttp
-import time
 import os
-import traceback
+import time
 from telegram import Bot
 from telegram.constants import ParseMode
-
-BOT_TOKEN = os.getenv("BOT_TOKEN")
-CHAT_ID = os.getenv("CHAT_ID")
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-announced_coins = {}
-last_no_pump_alert = 0
-NO_PUMP_ALERT_COOLDOWN = 60 * 15  # 15 دقیقه بین پیام "پامپی یافت نشد"
+BOT_TOKEN = os.getenv("BOT_TOKEN")
+CHAT_ID = os.getenv("CHAT_ID")
 
-PUMP_THRESHOLD_1H = 50   # رشد ۱ ساعت برای پامپ اصلی
-PUMP_THRESHOLD_30M = 15  # رشد ۳۰ دقیقه برای پامپ متوسط
-PUMP_THRESHOLD_15M = 0.1   # رشد ۱۵ دقیقه برای پامپ احتمالی
+ETHERSCAN_API_KEY = os.getenv("ETHERSCAN_API_KEY")
+COINGECKO_API_KEY = os.getenv("COINGECKO_API_KEY")
+HELIUS_API_KEY = os.getenv("HELIUS_API_KEY")
 
-PUMP_COOLDOWN = 60 * 60  # یک ساعت برای هر هشدار
+# متغیرهای Threshold (مثلا رشد بیش از 20%)
+PUMP_THRESHOLD_PERCENT = 20
 
-last_rate_limit_time = 0
-RATE_LIMIT_COOLDOWN = 60 * 30  # 30 دقیقه صبر پس از دریافت ریت لیمیت
-
-async def send_error(bot: Bot, err: Exception):
-    error_text = f"❌ خطا:\n<pre>{traceback.format_exc()}</pre>"
-    logger.error(traceback.format_exc())
-    try:
-        await bot.send_message(chat_id=CHAT_ID, text=error_text, parse_mode=ParseMode.HTML)
-    except Exception:
-        logger.error("❌ خطا در ارسال پیام خطا به تلگرام")
-
-async def check_pump(bot: Bot):
-    global last_rate_limit_time
-
-    now = time.time()
-    if now - last_rate_limit_time < RATE_LIMIT_COOLDOWN:
-        logger.info("⚠️ در دوره cooldown ریت لیمیت هستیم، فعلا چک نمی‌کنیم.")
-        return
-
+async def fetch_coingecko_meme_coins():
     url = "https://api.coingecko.com/api/v3/coins/markets"
     params = {
         "vs_currency": "usd",
@@ -50,128 +28,76 @@ async def check_pump(bot: Bot):
         "per_page": 50,
         "page": 1,
         "sparkline": "false",
-        "price_change_percentage": "15m,30m,1h",
+        "price_change_percentage": "1h,24h",
+        "x_cg_pro_api_key": COINGECKO_API_KEY,
     }
+    async with aiohttp.ClientSession() as session:
+        async with session.get(url, params=params) as resp:
+            return await resp.json()
 
+async def get_etherscan_contract_info(contract_address):
+    # نمونه درخواست ساده به Etherscan (توکن‌ و کانترکت چک)
+    url = f"https://api.etherscan.io/api"
+    params = {
+        "module": "contract",
+        "action": "getsourcecode",
+        "address": contract_address,
+        "apikey": ETHERSCAN_API_KEY
+    }
+    async with aiohttp.ClientSession() as session:
+        async with session.get(url, params=params) as resp:
+            data = await resp.json()
+            return data
+
+async def get_solana_token_info(mint_address):
+    # نمونه درخواست ساده به Helius سولانا
+    url = f"https://api.helius.xyz/v0/tokens/{mint_address}"
+    headers = {
+        "Authorization": f"Bearer {HELIUS_API_KEY}"
+    }
+    async with aiohttp.ClientSession() as session:
+        async with session.get(url, headers=headers) as resp:
+            data = await resp.json()
+            return data
+
+async def check_pumps(bot: Bot):
     try:
-        async with aiohttp.ClientSession() as session:
-            async with session.get(url, params=params) as response:
-                coins = await response.json()
+        coins = await fetch_coingecko_meme_coins()
 
-                # بررسی ریت لیمیت
-                if isinstance(coins, dict):
-                    status = coins.get("status", {})
-                    if status.get("error_code") == 429:
-                        last_rate_limit_time = now
-                        await bot.send_message(chat_id=CHAT_ID, text="⚠️ خطای ریت لیمیت از کوین‌گکو دریافت شد. به مدت ۳۰ دقیقه صبر کنید.")
-                        logger.warning("خطای ریت لیمیت، ۳۰ دقیقه صبر می‌کنیم.")
-                        return
+        for coin in coins:
+            # چک رشد ۱ ساعته بالای 20 درصد
+            change_1h = coin.get("price_change_percentage_1h_in_currency", 0) or 0
+            if change_1h >= PUMP_THRESHOLD_PERCENT:
+                name = coin["name"]
+                symbol = coin["symbol"].upper()
+                price = coin["current_price"]
+                contract_address = coin.get("contract_address") or "ندارد"
+                url_coingecko = f"https://www.coingecko.com/en/coins/{coin['id']}"
 
-                if not isinstance(coins, list):
-                    raise ValueError(f"خروجی API لیست نیست! نوع داده: {type(coins)}")
+                # اینجا می‌تونی اطلاعات بیشتر از Etherscan یا Helius بگیری
+                # فعلا پیام ساده میفرستیم
 
-                found_pump = False
-                found_pump_alert = False
-                found_pump_mid = False
-
-                for coin in coins:
-                    if not isinstance(coin, dict):
-                        continue
-
-                    coin_id = coin['id']
-                    name = coin['name']
-                    symbol = coin['symbol'].upper()
-                    price = coin['current_price']
-                    volume = coin.get("total_volume") or 0
-
-                    if volume < 1:
-                        continue
-
-                    change_15m = coin.get("price_change_percentage_15m_in_currency") or 0
-                    change_30m = coin.get("price_change_percentage_30m_in_currency") or 0
-                    change_1h = coin.get("price_change_percentage_1h_in_currency") or 0
-
-                    if change_1h >= PUMP_THRESHOLD_1H:
-                        last_alert = announced_coins.get(f"{coin_id}_1h", 0)
-                        if now - last_alert > PUMP_COOLDOWN:
-                            announced_coins[f"{coin_id}_1h"] = now
-                            message = f"""
-🚀 پامپ شدید شناسایی شد!
+                message = f"""🚀 پامپ شدید شناسایی شد!
 <b>{name} ({symbol})</b>
 📈 رشد ۱ ساعته: <b>{change_1h:.2f}%</b>
 💰 قیمت فعلی: ${price}
-📊 حجم معاملات: {volume:,}
-🔗 <a href="https://www.coingecko.com/en/coins/{coin_id}">مشاهده در CoinGecko</a>
+📜 آدرس کانترکت: <code>{contract_address}</code>
+🔗 مشاهده در CoinGecko: {url_coingecko}
 """
-                            await bot.send_message(chat_id=CHAT_ID, text=message, parse_mode=ParseMode.HTML)
-                            logger.info(f"پامپ شدید: {name} {change_1h:.2f}%")
-                            found_pump = True
+                await bot.send_message(chat_id=CHAT_ID, text=message, parse_mode=ParseMode.HTML)
+                logger.info(f"ارسال پیام پامپ: {name}")
 
-                    elif change_30m >= PUMP_THRESHOLD_30M:
-                        last_alert = announced_coins.get(f"{coin_id}_30m", 0)
-                        if now - last_alert > PUMP_COOLDOWN:
-                            announced_coins[f"{coin_id}_30m"] = now
-                            message = f"""
-⚡ پامپ متوسط در حال شکل‌گیری!
-<b>{name} ({symbol})</b>
-📈 رشد ۳۰ دقیقه‌ای: <b>{change_30m:.2f}%</b>
-💰 قیمت فعلی: ${price}
-📊 حجم معاملات: {volume:,}
-🔗 <a href="https://www.coingecko.com/en/coins/{coin_id}">مشاهده در CoinGecko</a>
-"""
-                            await bot.send_message(chat_id=CHAT_ID, text=message, parse_mode=ParseMode.HTML)
-                            logger.info(f"پامپ متوسط: {name} {change_30m:.2f}%")
-                            found_pump_mid = True
-
-                    elif change_15m >= PUMP_THRESHOLD_15M:
-                        last_alert = announced_coins.get(f"{coin_id}_15m", 0)
-                        if now - last_alert > PUMP_COOLDOWN:
-                            announced_coins[f"{coin_id}_15m"] = now
-                            message = f"""
-⚠️ پامپ احتمالی در حال شکل‌گیری!
-<b>{name} ({symbol})</b>
-📈 رشد ۱۵ دقیقه‌ای: <b>{change_15m:.2f}%</b>
-💰 قیمت فعلی: ${price}
-📊 حجم معاملات: {volume:,}
-🔗 <a href="https://www.coingecko.com/en/coins/{coin_id}">مشاهده در CoinGecko</a>
-"""
-                            await bot.send_message(chat_id=CHAT_ID, text=message, parse_mode=ParseMode.HTML)
-                            logger.info(f"پامپ احتمالی: {name} {change_15m:.2f}%")
-                            found_pump_alert = True
-
-                global last_no_pump_alert
-                if not found_pump and not found_pump_mid and not found_pump_alert:
-                    if now - last_no_pump_alert > NO_PUMP_ALERT_COOLDOWN:
-                        await bot.send_message(chat_id=CHAT_ID, text="ℹ️ پامپی یافت نشد.")
-                        logger.info("هیچ پامپی یافت نشد.")
-                        last_no_pump_alert = now
+        # اگر پامپی نبود، پیام نده (یا در نسخه بعد اضافه می‌کنیم)
 
     except Exception as e:
-        await send_error(bot, e)
-
-async def send_heartbeat(bot: Bot):
-    while True:
-        try:
-            await bot.send_message(chat_id=CHAT_ID, text="💓 بات فعال است و در حال اجرا...")
-            logger.info("پیام سلامت بات ارسال شد")
-        except Exception:
-            logger.error("خطا در ارسال پیام سلامت بات")
-        await asyncio.sleep(300)  # هر 5 دقیقه یکبار
+        logger.error(f"خطا در check_pumps: {e}")
 
 async def main_loop():
     bot = Bot(token=BOT_TOKEN)
-    await bot.send_message(chat_id=CHAT_ID, text="✅ ربات پامپ‌یاب ارتقا یافته شروع به کار کرد.")
-    logger.info("ربات شروع به کار کرد")
-
-    await asyncio.gather(
-        run_check_pump_loop(bot),
-        send_heartbeat(bot),
-    )
-
-async def run_check_pump_loop(bot: Bot):
+    await bot.send_message(chat_id=CHAT_ID, text="✅ ربات پامپ‌یاب حرفه‌ای شروع به کار کرد.")
     while True:
-        await check_pump(bot)
-        await asyncio.sleep(900)  # هر 15 دقیقه چک کن
+        await check_pumps(bot)
+        await asyncio.sleep(300)  # هر 5 دقیقه بررسی کن
 
 if __name__ == "__main__":
     asyncio.run(main_loop())
