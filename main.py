@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 # ذخیره آخرین هشدارها
 announced_coins = {}
 PUMP_THRESHOLD = 50  # درصد رشد در ۱ ساعت
-PUMP_COOLDOWN = 60 * 60  # ۱ ساعت
+PUMP_COOLDOWN = 60 * 60  # یک ساعت
 
 async def check_pump(bot: Bot):
     url = "https://api.coingecko.com/api/v3/coins/markets"
@@ -64,10 +64,9 @@ async def check_pump(bot: Bot):
                     found_pump = True
 
                 if not found_pump:
-                    # پیام تستی اگر پامپی نبود
-                    await bot.send_message(chat_id=CHAT_ID, text="ℹ️ بررسی انجام شد، پامپ جدیدی یافت نشد.")
+                    await bot.send_message(chat_id=CHAT_ID, text="ℹ️ پامپی یافت نشد.")
 
-    except Exception as e:
+    except Exception:
         error_text = f"❌ خطا در بررسی پامپ:\n<pre>{traceback.format_exc()}</pre>"
         logger.error(error_text)
         await bot.send_message(chat_id=CHAT_ID, text=error_text, parse_mode=ParseMode.HTML)
