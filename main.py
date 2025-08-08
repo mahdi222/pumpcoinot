@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 announced_coins = {}
 last_no_pump_alert = 0
-NO_PUMP_ALERT_COOLDOWN = 60 * 30  # 30 دقیقه بین پیام "پامپی یافت نشد"
+NO_PUMP_ALERT_COOLDOWN = 60 * 5  # 30 دقیقه بین پیام "پامپی یافت نشد"
 
 PUMP_THRESHOLD_1H = 50   # رشد ۱ ساعت برای پامپ اصلی
 PUMP_THRESHOLD_30M = 15  # رشد ۳۰ دقیقه برای پامپ متوسط
