@@ -6,7 +6,7 @@ import time
 from telegram import Bot
 from telegram.constants import ParseMode
 
-BOT_TOKEN = os.getenv("TOKEN")
+BOT_TOKEN = os.getenv("BOT_TOKEN")
 CHAT_ID = os.getenv("CHAT_ID")
 
 logging.basicConfig(level=logging.INFO)
