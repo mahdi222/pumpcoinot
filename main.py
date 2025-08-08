@@ -17,7 +17,7 @@ COINGECKO_API_KEY = os.getenv("COINGECKO_API_KEY")
 HELIUS_API_KEY = os.getenv("HELIUS_API_KEY")
 
 # متغیرهای Threshold (مثلا رشد بیش از 20%)
-PUMP_THRESHOLD_PERCENT = 20
+PUMP_THRESHOLD_PERCENT = 0.5
 
 async def fetch_coingecko_meme_coins():
     url = "https://api.coingecko.com/api/v3/coins/markets"
