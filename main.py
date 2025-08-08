@@ -146,7 +146,7 @@ async def send_heartbeat(bot: Bot):
             logger.info("پیام سلامت بات ارسال شد")
         except Exception:
             logger.error("خطا در ارسال پیام سلامت بات")
-        await asyncio.sleep(1800)  # هر ۳۰ دقیقه یکبار
+        await asyncio.sleep(300)  # هر 5 دقیقه یکبار
 
 async def main_loop():
     bot = Bot(token=BOT_TOKEN)
