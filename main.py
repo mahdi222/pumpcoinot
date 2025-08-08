@@ -1,21 +1,21 @@
-# import os
-# import asyncio
-# import logging
-# import aiohttp
-# import time
-# from telegram import Bot
-# from telegram.constants import ParseMode
+import os
+import asyncio
+import logging
+import aiohttp
+import time
+from telegram import Bot
+from telegram.constants import ParseMode
 
-# BOT_TOKEN = os.getenv("TOKEN")
-# CHAT_ID = os.getenv("CHAT_ID")
+BOT_TOKEN = os.getenv("TOKEN")
+CHAT_ID = os.getenv("CHAT_ID")
 
-# logging.basicConfig(level=logging.INFO)
-# logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-# # ذخیره زمان هشدار برای جلوگیری از اسپم
-# announced_coins = {}
-# PUMP_THRESHOLD = 50       # درصد رشد
-# PUMP_COOLDOWN = 60 * 60   # یک ساعت
+# ذخیره زمان هشدار برای جلوگیری از اسپم
+announced_coins = {}
+PUMP_THRESHOLD = 50       # درصد رشد
+PUMP_COOLDOWN = 60 * 60   # یک ساعت
 
 # async def check_pump(bot: Bot):
 #     url = "https://api.coingecko.com/api/v3/coins/markets"
