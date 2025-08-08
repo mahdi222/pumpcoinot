@@ -24,33 +24,30 @@ PUMP_THRESHOLD_15M = 0.1   # رشد ۱۵ دقیقه برای پامپ احتما
 PUMP_COOLDOWN = 60 * 60  # یک ساعت برای هر هشدار
 
 last_rate_limit_time = 0
-RATE_LIMIT_COOLDOWN = 60 * 15  # 15 دقیقه cooldown پس از ریت لیمیت
+RATE_LIMIT_COOLDOWN = 60 * 30  # 30 دقیقه صبر پس از دریافت ریت لیمیت
 
-async def send_error(bot: Bot, err_text: str, use_html=True):
-    logger.error(err_text)
+async def send_error(bot: Bot, err: Exception):
+    error_text = f"❌ خطا:\n<pre>{traceback.format_exc()}</pre>"
+    logger.error(traceback.format_exc())
     try:
-        if use_html:
-            await bot.send_message(chat_id=CHAT_ID, text=f"❌ خطا:\n<pre>{err_text}</pre>", parse_mode=ParseMode.HTML)
-        else:
-            await bot.send_message(chat_id=CHAT_ID, text=f"❌ خطا:\n{err_text}")
-    except Exception as e:
-        logger.error(f"❌ خطا در ارسال پیام خطا به تلگرام: {e}")
+        await bot.send_message(chat_id=CHAT_ID, text=error_text, parse_mode=ParseMode.HTML)
+    except Exception:
+        logger.error("❌ خطا در ارسال پیام خطا به تلگرام")
 
 async def check_pump(bot: Bot):
     global last_rate_limit_time
 
     now = time.time()
     if now - last_rate_limit_time < RATE_LIMIT_COOLDOWN:
-        logger.info("در دوره cooldown ریت لیمیت هستیم، درخواست نمی‌فرستیم.")
+        logger.info("⚠️ در دوره cooldown ریت لیمیت هستیم، فعلا چک نمی‌کنیم.")
         return
 
-    logger.info("check_pump داره اجرا میشه...")
     url = "https://api.coingecko.com/api/v3/coins/markets"
     params = {
         "vs_currency": "usd",
         "category": "meme",
         "order": "market_cap_desc",
-        "per_page": 10,
+        "per_page": 50,
         "page": 1,
         "sparkline": "false",
         "price_change_percentage": "15m,30m,1h",
@@ -60,19 +57,15 @@ async def check_pump(bot: Bot):
         async with aiohttp.ClientSession() as session:
             async with session.get(url, params=params) as response:
                 coins = await response.json()
-                logger.info(f"داده دریافت شد: نوع داده {type(coins)}")
 
-                # بررسی خطای ریت لیمیت
+                # بررسی ریت لیمیت
                 if isinstance(coins, dict):
                     status = coins.get("status", {})
                     if status.get("error_code") == 429:
                         last_rate_limit_time = now
-                        await bot.send_message(chat_id=CHAT_ID, text="⚠️ خطای ریت لیمیت از کوین‌گکو دریافت شد. به مدت 15 دقیقه صبر کنید.")
-                        logger.warning("خطای ریت لیمیت از API دریافت شد، 15 دقیقه صبر می‌کنیم.")
+                        await bot.send_message(chat_id=CHAT_ID, text="⚠️ خطای ریت لیمیت از کوین‌گکو دریافت شد. به مدت ۳۰ دقیقه صبر کنید.")
+                        logger.warning("خطای ریت لیمیت، ۳۰ دقیقه صبر می‌کنیم.")
                         return
-                    error_msg = coins.get("error") or str(coins)
-                    await send_error(bot, f"خطای API: {error_msg}", use_html=False)
-                    return
 
                 if not isinstance(coins, list):
                     raise ValueError(f"خروجی API لیست نیست! نوع داده: {type(coins)}")
@@ -90,6 +83,9 @@ async def check_pump(bot: Bot):
                     symbol = coin['symbol'].upper()
                     price = coin['current_price']
                     volume = coin.get("total_volume") or 0
+
+                    if volume < 1:
+                        continue
 
                     change_15m = coin.get("price_change_percentage_15m_in_currency") or 0
                     change_30m = coin.get("price_change_percentage_30m_in_currency") or 0
@@ -151,9 +147,7 @@ async def check_pump(bot: Bot):
                         last_no_pump_alert = now
 
     except Exception as e:
-        err_text = traceback.format_exc()
-        logger.error(f"خطا در check_pump:\n{err_text}")
-        await send_error(bot, err_text)
+        await send_error(bot, e)
 
 async def send_heartbeat(bot: Bot):
     while True:
@@ -177,7 +171,7 @@ async def main_loop():
 async def run_check_pump_loop(bot: Bot):
     while True:
         await check_pump(bot)
-        await asyncio.sleep(300)  # هر 5 دقیقه یکبار چک می‌کنیم
+        await asyncio.sleep(900)  # هر 15 دقیقه چک کن
 
 if __name__ == "__main__":
     asyncio.run(main_loop())
